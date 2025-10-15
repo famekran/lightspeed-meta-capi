@@ -66,9 +66,10 @@ export async function hashUserData(userData) {
     hashed.zp = [await sha256(userData.zipcode)];
   }
 
-  // Country (ISO 2-letter code, lowercase, NOT hashed)
+  // Country (ISO 2-letter code, lowercase, then hashed)
+  // NOTE: Meta docs say NOT to hash, but in practice it requires hashing
   if (userData.country) {
-    hashed.country = [userData.country.toLowerCase()];
+    hashed.country = [await sha256(userData.country.toLowerCase())];
   }
 
   return hashed;

@@ -6,6 +6,7 @@
  */
 
 import { handleWebhook } from './handlers/webhook.js';
+import { handleCron } from './handlers/cron.js';
 import { listShops } from './config/shops.js';
 
 export default {
@@ -29,12 +30,21 @@ export default {
       return new Response(JSON.stringify({
         status: 'ok',
         service: 'Lightspeed Meta CAPI Bridge',
-        version: '1.0.0',
+        version: '2.0.0',
+        mode: 'polling',
+        pollingInterval: '5 minutes',
         shops: listShops(),
         endpoints: {
           webhook: '/webhook?shop={shopId}',
           health: '/health'
         },
+        features: [
+          'Automatic order polling every 5 minutes',
+          'Manual webhook support',
+          'Multi-tenant (VikGinChoice + Retoertje)',
+          'SHA-256 user data hashing',
+          'Event deduplication'
+        ],
         timestamp: new Date().toISOString()
       }, null, 2), {
         headers: { 'Content-Type': 'application/json' }
@@ -58,5 +68,13 @@ export default {
       status: 404,
       headers: { 'Content-Type': 'application/json' }
     });
+  },
+
+  // Cron trigger for polling Lightspeed orders
+  async scheduled(event, env, ctx) {
+    console.log('📅 Scheduled event triggered');
+
+    // Execute cron handler with waitUntil to allow completion
+    ctx.waitUntil(handleCron(event, env));
   }
 };

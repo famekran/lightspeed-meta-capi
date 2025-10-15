@@ -24,6 +24,10 @@ workers_dev = true
 NODE_ENV = "production"
 DEBUG_MODE = "false"
 
+# Cron Triggers - Poll Lightspeed orders every 5 minutes
+[triggers]
+crons = ["*/5 * * * *"]  # Every 5 minutes
+
 # Secrets (gebruik wrangler secret put voor deze)
 # Deze zijn NIET in deze file, maar via CLI:
 # wrangler secret put META_ACCESS_TOKEN

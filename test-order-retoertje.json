@@ -1,0 +1,28 @@
+{
+  "number": "TEST-12345",
+  "currency": "EUR",
+  "priceIncl": 99.99,
+  "total": 99.99,
+  "customer": {
+    "email": "test@example.com",
+    "firstname": "Jan",
+    "lastname": "Jansen",
+    "phone": "+31612345678"
+  },
+  "addressBilling": {
+    "city": "Amsterdam",
+    "zipcode": "1012AB",
+    "country": {
+      "code": "NL"
+    }
+  },
+  "products": [
+    {
+      "productId": "123",
+      "variantId": "456",
+      "quantity": 2,
+      "basePriceIncl": "49.99",
+      "title": "Test Product"
+    }
+  ]
+}
