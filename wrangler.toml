@@ -1,0 +1,47 @@
+name = "lightspeed-meta-capi"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+# Account (vul in met jouw Cloudflare Account ID)
+account_id = ""  # Invullen vanaf .env.local
+
+# Worker Settings
+workers_dev = true
+route = ""  # Optioneel: custom domain route
+
+# R2 Bindings (optioneel - voor logging)
+# Uncomment als je R2 logging wilt gebruiken
+# [[r2_buckets]]
+# binding = "LOGS"
+# bucket_name = "lightspeed-meta-logs"
+
+# KV Namespaces (optioneel - voor caching/state)
+# [[kv_namespaces]]
+# binding = "CACHE"
+# id = ""  # KV Namespace ID
+
+# Environment Variables (non-sensitive only)
+[vars]
+NODE_ENV = "production"
+DEBUG_MODE = "false"
+
+# Secrets (gebruik wrangler secret put voor deze)
+# Deze zijn NIET in deze file, maar via CLI:
+# wrangler secret put META_ACCESS_TOKEN
+# wrangler secret put META_PIXEL_ID
+# wrangler secret put LIGHTSPEED_API_KEY
+# wrangler secret put LIGHTSPEED_API_SECRET
+# wrangler secret put WEBHOOK_SECRET
+
+# Triggers (optioneel - cron jobs)
+# [triggers]
+# crons = ["0 */4 * * *"]  # Elke 4 uur
+
+# Build Configuration
+[build]
+command = "npm run build"
+
+# Development Settings
+[dev]
+port = 8787
+local_protocol = "http"

@@ -1,0 +1,37 @@
+# Environment Variables (CRITICAL - NEVER COMMIT)
+.env
+.env.local
+.env*.local
+
+# Wrangler
+.wrangler/
+wrangler.toml.backup
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Build
+dist/
+build/
+
+# Temp
+tmp/
+temp/
