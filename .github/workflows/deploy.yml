@@ -1,0 +1,73 @@
+name: Deploy to Cloudflare Workers
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    name: Deploy Multi-Tenant Worker
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test --if-present
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      - name: Setup Worker secrets
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "🔐 Setting up Worker secrets..."
+
+          # VikGinChoice secrets
+          echo "${{ secrets.VIKGINCHOICE_LIGHTSPEED_API_KEY }}" | wrangler secret put VIKGINCHOICE_LIGHTSPEED_API_KEY
+          echo "${{ secrets.VIKGINCHOICE_LIGHTSPEED_API_SECRET }}" | wrangler secret put VIKGINCHOICE_LIGHTSPEED_API_SECRET
+          echo "${{ secrets.VIKGINCHOICE_LIGHTSPEED_SHOP_ID }}" | wrangler secret put VIKGINCHOICE_LIGHTSPEED_SHOP_ID
+          echo "${{ secrets.VIKGINCHOICE_META_ACCESS_TOKEN }}" | wrangler secret put VIKGINCHOICE_META_ACCESS_TOKEN
+          echo "${{ secrets.VIKGINCHOICE_META_PIXEL_ID }}" | wrangler secret put VIKGINCHOICE_META_PIXEL_ID
+
+          # Retoertje secrets
+          echo "${{ secrets.RETOERTJE_LIGHTSPEED_API_KEY }}" | wrangler secret put RETOERTJE_LIGHTSPEED_API_KEY
+          echo "${{ secrets.RETOERTJE_LIGHTSPEED_API_SECRET }}" | wrangler secret put RETOERTJE_LIGHTSPEED_API_SECRET
+          echo "${{ secrets.RETOERTJE_LIGHTSPEED_SHOP_ID }}" | wrangler secret put RETOERTJE_LIGHTSPEED_SHOP_ID
+          echo "${{ secrets.RETOERTJE_META_ACCESS_TOKEN }}" | wrangler secret put RETOERTJE_META_ACCESS_TOKEN
+          echo "${{ secrets.RETOERTJE_META_PIXEL_ID }}" | wrangler secret put RETOERTJE_META_PIXEL_ID
+
+          echo "✅ All secrets configured!"
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deployment summary
+        if: success()
+        run: |
+          echo "🎉 Deployment successful!"
+          echo "🔗 Worker URL: https://lightspeed-meta-capi.f-amekran.workers.dev"
+          echo ""
+          echo "📝 Next steps:"
+          echo "1. Configure webhooks in Lightspeed:"
+          echo "   - VikGinChoice: https://lightspeed-meta-capi.f-amekran.workers.dev/webhook?shop=vikginchoice"
+          echo "   - Retoertje: https://lightspeed-meta-capi.f-amekran.workers.dev/webhook?shop=retoertje"
+          echo "2. Test with Meta Test Events Tool"
+          echo "3. Monitor via: wrangler tail --format pretty"

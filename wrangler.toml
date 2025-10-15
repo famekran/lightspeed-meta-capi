@@ -2,8 +2,8 @@ name = "lightspeed-meta-capi"
 main = "src/index.js"
 compatibility_date = "2024-01-01"
 
-# Account (vul in met jouw Cloudflare Account ID)
-account_id = ""  # Invullen vanaf .env.local
+# Account
+account_id = "2febeaec7b825dc19b659d7e783cf622"
 
 # Worker Settings
 workers_dev = true
