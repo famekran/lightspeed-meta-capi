@@ -7,7 +7,6 @@ account_id = "2febeaec7b825dc19b659d7e783cf622"
 
 # Worker Settings
 workers_dev = true
-route = ""  # Optioneel: custom domain route
 
 # R2 Bindings (optioneel - voor logging)
 # Uncomment als je R2 logging wilt gebruiken
