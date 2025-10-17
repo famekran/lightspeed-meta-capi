@@ -14,19 +14,20 @@ workers_dev = true
 # binding = "LOGS"
 # bucket_name = "lightspeed-meta-logs"
 
-# KV Namespaces (optioneel - voor caching/state)
-# [[kv_namespaces]]
-# binding = "CACHE"
-# id = ""  # KV Namespace ID
+# KV Namespaces - Voor order deduplication
+[[kv_namespaces]]
+binding = "ORDER_DEDUP"
+id = "c261da492df0431d8ca4e74e71cb046e"
+preview_id = "b7e3dee45ea84127b70a7d563425f041"
 
 # Environment Variables (non-sensitive only)
 [vars]
 NODE_ENV = "production"
 DEBUG_MODE = "false"
 
-# Cron Triggers - Poll Lightspeed orders every 5 minutes
+# Cron Triggers - Backup polling every hour (webhook is primary)
 [triggers]
-crons = ["*/5 * * * *"]  # Every 5 minutes
+crons = ["0 * * * *"]  # Every hour at :00 (00:00, 01:00, 02:00, etc.)
 
 # Secrets (gebruik wrangler secret put voor deze)
 # Deze zijn NIET in deze file, maar via CLI:

@@ -35,8 +35,8 @@ export async function handleCron(event, env) {
           errors: []
         };
 
-        // Fetch orders from last 6 minutes (matches cron frequency with 1min overlap)
-        const orders = await fetchRecentOrders(shopConfig, 6);
+        // Fetch orders from last 61 minutes (1 hour cron + 1min safety margin)
+        const orders = await fetchRecentOrders(shopConfig, 61);
         shopResult.ordersChecked = orders.length;
 
         console.log(`Found ${orders.length} orders for ${shopConfig.name}`);
@@ -57,6 +57,16 @@ export async function handleCron(event, env) {
               continue;
             }
 
+            // Check deduplication (skip if already sent by webhook or previous cron)
+            const dedupKey = `order_${shopConfig.id}_${order.number}`;
+            if (env.ORDER_DEDUP) {
+              const alreadySent = await env.ORDER_DEDUP.get(dedupKey);
+              if (alreadySent) {
+                console.log(`Order ${order.number} already sent (likely by webhook), skipping`);
+                continue;
+              }
+            }
+
             // Fetch products for this order
             console.log(`Fetching products for order ${order.number}...`);
             const products = await fetchOrderProducts(order.id, shopConfig);
@@ -68,6 +78,16 @@ export async function handleCron(event, env) {
 
             // Send to Meta CAPI
             const metaResponse = await sendPurchaseEvent(order, shopConfig);
+
+            // Mark as sent (24h TTL)
+            if (env.ORDER_DEDUP) {
+              await env.ORDER_DEDUP.put(dedupKey, JSON.stringify({
+                timestamp: new Date().toISOString(),
+                orderId: order.number,
+                shop: shopConfig.name,
+                source: 'cron'
+              }), { expirationTtl: 86400 }); // 24 hours
+            }
 
             shopResult.ordersSent++;
             console.log(`✅ Order ${order.number} sent successfully`, {

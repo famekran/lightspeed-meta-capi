@@ -66,9 +66,35 @@ export async function handleWebhook(request, env) {
       }, 400);
     }
 
-    // 5. Send to Meta CAPI
+    // 5. Check deduplication (prevent duplicate webhooks)
+    const dedupKey = `order_${shopConfig.id}_${payload.number}`;
+
+    if (env.ORDER_DEDUP) {
+      const alreadySent = await env.ORDER_DEDUP.get(dedupKey);
+      if (alreadySent) {
+        console.log(`Order ${payload.number} already sent, skipping duplicate webhook`);
+        return jsonResponse({
+          success: true,
+          duplicate: true,
+          shop: shopConfig.name,
+          orderId: payload.number,
+          message: 'Order already processed (deduplication)'
+        }, 200);
+      }
+    }
+
+    // 6. Send to Meta CAPI
     try {
       const result = await sendPurchaseEvent(payload, shopConfig);
+
+      // Mark as sent (24h TTL)
+      if (env.ORDER_DEDUP) {
+        await env.ORDER_DEDUP.put(dedupKey, JSON.stringify({
+          timestamp: new Date().toISOString(),
+          orderId: payload.number,
+          shop: shopConfig.name
+        }), { expirationTtl: 86400 }); // 24 hours
+      }
 
       return jsonResponse({
         success: true,
