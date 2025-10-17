@@ -52,7 +52,7 @@ echo -e "${YELLOW}Response:${NC}"
 echo "$RESPONSE" | jq '.' 2>/dev/null || echo "$RESPONSE"
 echo ""
 
-if echo "$RESPONSE" | grep -q '"success":true'; then
+if echo "$RESPONSE" | grep -q '"success": true'; then
   echo -e "${GREEN}✅ Webhook test successful!${NC}"
 else
   echo -e "${RED}❌ Webhook test failed${NC}"
