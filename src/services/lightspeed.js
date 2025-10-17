@@ -17,10 +17,12 @@ export async function fetchRecentOrders(shopConfig, sinceMinutes = 10) {
   const sinceTimestamp = sinceDate.toISOString();
 
   // Build Lightspeed API request
-  const url = `${lightspeed.clusterUrl}/nl/shops/${lightspeed.shopId}/orders.json`;
+  // Note: EU cluster uses /nl/ and plural /orders.json
+  const url = `${lightspeed.clusterUrl}/${lightspeed.language}/orders.json`;
   const params = new URLSearchParams({
-    createdAt: `>${sinceTimestamp}`, // Orders created after this timestamp
-    limit: 50 // Max orders per request
+    createdAtMin: sinceTimestamp, // Orders created after this timestamp
+    limit: 50, // Max orders per request
+    embed: 'customer' // Include customer data in response
   });
 
   const fullUrl = `${url}?${params}`;
@@ -62,6 +64,39 @@ export async function fetchRecentOrders(shopConfig, sinceMinutes = 10) {
 }
 
 /**
+ * Fetch products for an order from Lightspeed
+ * @param {number} orderId - Order ID
+ * @param {Object} shopConfig - Shop configuration
+ * @returns {Array} Array of products
+ */
+export async function fetchOrderProducts(orderId, shopConfig) {
+  const { lightspeed } = shopConfig;
+
+  const url = `${lightspeed.clusterUrl}/${lightspeed.language}/orders/${orderId}/products.json`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Basic ${btoa(lightspeed.apiKey + ':' + lightspeed.apiSecret)}`
+      }
+    });
+
+    if (!response.ok) {
+      console.error(`Failed to fetch products for order ${orderId}:`, response.statusText);
+      return []; // Return empty array if products can't be fetched
+    }
+
+    const data = await response.json();
+    return data.orderProducts || [];
+  } catch (error) {
+    console.error(`Failed to fetch products for order ${orderId}:`, error);
+    return []; // Return empty array on error
+  }
+}
+
+/**
  * Fetch a single order by ID from Lightspeed
  * @param {string} orderId - Order ID
  * @param {Object} shopConfig - Shop configuration
@@ -70,7 +105,7 @@ export async function fetchRecentOrders(shopConfig, sinceMinutes = 10) {
 export async function fetchOrderById(orderId, shopConfig) {
   const { lightspeed } = shopConfig;
 
-  const url = `${lightspeed.clusterUrl}/nl/shops/${lightspeed.shopId}/orders/${orderId}.json`;
+  const url = `${lightspeed.clusterUrl}/${lightspeed.language}/orders/${orderId}.json`;
 
   try {
     const response = await fetch(url, {

@@ -39,15 +39,18 @@ export async function handleWebhook(request, env) {
     }
 
     // 3. Parse webhook payload
-    let payload;
+    let rawPayload;
     try {
-      payload = await request.json();
+      rawPayload = await request.json();
     } catch (error) {
       return jsonResponse({
         error: 'Invalid JSON payload',
         message: error.message
       }, 400);
     }
+
+    // Extract order data - Lightspeed may send {order: {...}} or just {...}
+    const payload = rawPayload.order || rawPayload;
 
     console.log(`Webhook payload:`, {
       orderId: payload.number,

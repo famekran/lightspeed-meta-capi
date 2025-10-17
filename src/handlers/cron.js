@@ -4,7 +4,7 @@
  */
 
 import { listShops, getShopConfig } from '../config/shops.js';
-import { fetchRecentOrders } from '../services/lightspeed.js';
+import { fetchRecentOrders, fetchOrderProducts } from '../services/lightspeed.js';
 import { sendPurchaseEvent } from '../services/meta-capi.js';
 
 /**
@@ -45,7 +45,8 @@ export async function handleCron(event, env) {
         for (const order of orders) {
           try {
             // Check if order is complete (has customer data and payment)
-            if (!order.customer || !order.customer.email) {
+            // Note: Lightspeed puts customer fields directly on order object
+            if (!order.email) {
               console.log(`Skipping order ${order.number}: incomplete customer data`);
               continue;
             }
@@ -56,7 +57,14 @@ export async function handleCron(event, env) {
               continue;
             }
 
-            console.log(`Sending order ${order.number} to Meta CAPI...`);
+            // Fetch products for this order
+            console.log(`Fetching products for order ${order.number}...`);
+            const products = await fetchOrderProducts(order.id, shopConfig);
+
+            // Add products to order object
+            order.products = products;
+
+            console.log(`Sending order ${order.number} to Meta CAPI (${products.length} products)...`);
 
             // Send to Meta CAPI
             const metaResponse = await sendPurchaseEvent(order, shopConfig);

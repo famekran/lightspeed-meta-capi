@@ -75,17 +75,18 @@ export async function sendPurchaseEvent(orderData, shopConfig) {
  * @returns {Object} Hashed user data for Meta CAPI
  */
 async function buildUserData(orderData) {
-  const customer = orderData.customer || {};
-  const billing = orderData.addressBilling || {};
+  // Note: Lightspeed puts customer fields directly on order object
+  // addressBilling contains the billing address
+  const billing = orderData.addressBillingCountry || orderData.addressBilling || {};
 
   const rawUserData = {
-    email: customer.email,
-    phone: customer.phone || billing.phone,
-    firstName: customer.firstname,
-    lastName: customer.lastname,
-    city: billing.city,
-    zipcode: billing.zipcode,
-    country: billing.country?.code || 'nl' // ISO 2-letter code
+    email: orderData.email,
+    phone: orderData.phone || orderData.mobile,
+    firstName: orderData.firstname,
+    lastName: orderData.lastname,
+    city: orderData.addressBillingCity,
+    zipcode: orderData.addressBillingZipcode,
+    country: orderData.addressBillingCountry?.code || 'nl' // ISO 2-letter code
   };
 
   // Hash all PII data
@@ -98,13 +99,26 @@ async function buildUserData(orderData) {
  * @returns {Object} Custom data for Meta CAPI
  */
 function buildCustomData(orderData) {
-  // Extract product data
+  // Extract product data (fetched separately via /orders/{id}/products.json)
   const products = orderData.products || [];
-  const contentIds = products.map(p => String(p.variantId || p.productId));
+
+  // Extract variant IDs or product IDs from the orderProduct objects
+  // Note: variant is a resource object, we need to extract the ID from it
+  const contentIds = products.map(p => {
+    if (p.variant && p.variant.resource && p.variant.resource.id) {
+      return String(p.variant.resource.id);
+    }
+    // Fallback to product ID if variant not available
+    if (p.product && p.product.resource && p.product.resource.id) {
+      return String(p.product.resource.id);
+    }
+    return String(p.id); // Last resort: use orderProduct ID
+  });
+
   const contents = products.map(p => ({
-    id: String(p.variantId || p.productId),
-    quantity: p.quantity || 1,
-    item_price: parseFloat(p.basePriceIncl || p.price || 0)
+    id: (p.variant?.resource?.id || p.product?.resource?.id || p.id).toString(),
+    quantity: p.quantityOrdered || 1,
+    item_price: parseFloat(p.basePriceIncl || 0)
   }));
 
   return {
