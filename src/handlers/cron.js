@@ -35,8 +35,8 @@ export async function handleCron(event, env) {
           errors: []
         };
 
-        // Fetch orders from last 10 minutes (with 5min overlap for safety)
-        const orders = await fetchRecentOrders(shopConfig, 10);
+        // Fetch orders from last 6 minutes (matches cron frequency with 1min overlap)
+        const orders = await fetchRecentOrders(shopConfig, 6);
         shopResult.ordersChecked = orders.length;
 
         console.log(`Found ${orders.length} orders for ${shopConfig.name}`);
