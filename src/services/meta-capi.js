@@ -15,9 +15,17 @@ export async function sendPurchaseEvent(orderData, shopConfig) {
   const { meta } = shopConfig;
 
   // Build event payload
+  // CRITICAL: Use order creation time (when customer was on thank-you page)
+  // NOT the current time (when webhook is processed)
+  // This ensures proper deduplication with Pixel event
+  const orderCreatedAt = orderData.createdAt || orderData.created_at || orderData.updatedAt;
+  const eventTime = orderCreatedAt
+    ? Math.floor(new Date(orderCreatedAt).getTime() / 1000)
+    : Math.floor(Date.now() / 1000); // Fallback to now if no timestamp
+
   const event = {
     event_name: 'Purchase',
-    event_time: Math.floor(Date.now() / 1000), // Unix timestamp
+    event_time: eventTime,
     event_id: `purchase_${orderData.number}`, // CRITICAL: Must match Pixel event_id!
     event_source_url: `https://${shopConfig.domain}/checkout/thankyou`,
     action_source: 'website',
@@ -58,8 +66,11 @@ export async function sendPurchaseEvent(orderData, shopConfig) {
       shop: shopConfig.name,
       orderId: orderData.number,
       eventId: event.event_id,
+      eventTime: new Date(event.event_time * 1000).toISOString(), // Show human-readable time
+      eventTimeUnix: event.event_time,
       eventsReceived: result.events_received,
-      messagesReceived: result.messages?.length || 0
+      messagesReceived: result.messages?.length || 0,
+      fbtrace_id: result.fbtrace_id
     });
 
     return result;
