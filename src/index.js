@@ -31,19 +31,20 @@ export default {
         status: 'ok',
         service: 'Lightspeed Meta CAPI Bridge',
         version: '2.0.0',
-        mode: 'polling',
-        pollingInterval: '5 minutes',
+        mode: 'webhook + backup polling',
+        primaryMethod: 'Lightspeed webhooks (real-time)',
+        backupMethod: 'Hourly cron polling',
         shops: listShops(),
         endpoints: {
           webhook: '/webhook?shop={shopId}',
           health: '/health'
         },
         features: [
-          'Automatic order polling every 5 minutes',
-          'Manual webhook support',
+          'Real-time webhook processing (primary)',
+          'Hourly backup polling (catches missed events)',
           'Multi-tenant (VikGinChoice + Retoertje)',
           'SHA-256 user data hashing',
-          'Event deduplication'
+          'Event deduplication via KV'
         ],
         timestamp: new Date().toISOString()
       }, null, 2), {
