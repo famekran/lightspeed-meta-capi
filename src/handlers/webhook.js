@@ -52,6 +52,15 @@ export async function handleWebhook(request, env) {
     // Extract order data - Lightspeed may send {order: {...}} or just {...}
     const payload = rawPayload.order || rawPayload;
 
+    // Extract pixel data from payload if sent from thank-you page
+    const pixelData = {
+      fbc: rawPayload.fbc || null,
+      fbp: rawPayload.fbp || null,
+      client_user_agent: rawPayload.client_user_agent || request.headers.get('User-Agent') || null,
+      client_ip_address: request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || null,
+      event_source_url: rawPayload.event_source_url || null
+    };
+
     console.log(`Webhook payload:`, {
       orderId: payload.number,
       currency: payload.currency,
@@ -83,9 +92,9 @@ export async function handleWebhook(request, env) {
       }
     }
 
-    // 6. Send to Meta CAPI
+    // 6. Send to Meta CAPI with pixel data
     try {
-      const result = await sendPurchaseEvent(payload, shopConfig);
+      const result = await sendPurchaseEvent(payload, shopConfig, pixelData);
 
       // Mark as sent (24h TTL)
       if (env.ORDER_DEDUP) {

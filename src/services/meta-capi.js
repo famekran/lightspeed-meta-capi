@@ -9,9 +9,10 @@ import { hashUserData } from '../utils/hash.js';
  * Send Purchase event to Meta Conversions API
  * @param {Object} orderData - Order data from Lightspeed webhook
  * @param {Object} shopConfig - Shop configuration with Meta credentials
+ * @param {Object} pixelData - Optional data from pixel (fbc, fbp, user_agent, ip)
  * @returns {Object} Response from Meta CAPI
  */
-export async function sendPurchaseEvent(orderData, shopConfig) {
+export async function sendPurchaseEvent(orderData, shopConfig, pixelData = {}) {
   const { meta } = shopConfig;
 
   // Build event payload
@@ -27,9 +28,9 @@ export async function sendPurchaseEvent(orderData, shopConfig) {
     event_name: 'Purchase',
     event_time: eventTime,
     event_id: `purchase_${orderData.number}`, // CRITICAL: Must match Pixel event_id!
-    event_source_url: `https://${shopConfig.domain}/checkout/thankyou`,
+    event_source_url: pixelData.event_source_url || `https://${shopConfig.domain}/checkout/thankyou`,
     action_source: 'website',
-    user_data: await buildUserData(orderData),
+    user_data: await buildUserData(orderData, pixelData),
     custom_data: buildCustomData(orderData)
   };
 
@@ -81,11 +82,12 @@ export async function sendPurchaseEvent(orderData, shopConfig) {
 }
 
 /**
- * Build user_data object with SHA-256 hashed PII
+ * Build user_data object with SHA-256 hashed PII + CAPI-matching parameters
  * @param {Object} orderData - Order data from Lightspeed
+ * @param {Object} pixelData - Optional pixel data (fbc, fbp, user_agent, ip)
  * @returns {Object} Hashed user data for Meta CAPI
  */
-async function buildUserData(orderData) {
+async function buildUserData(orderData, pixelData = {}) {
   // Note: Lightspeed puts customer fields directly on order object
   // addressBilling contains the billing address
   const billing = orderData.addressBillingCountry || orderData.addressBilling || {};
@@ -101,7 +103,39 @@ async function buildUserData(orderData) {
   };
 
   // Hash all PII data
-  return await hashUserData(rawUserData);
+  const hashedData = await hashUserData(rawUserData);
+
+  // Add CRITICAL CAPI-matching parameters (NOT hashed!)
+  // These dramatically improve gebeurtenisdekking (event coverage)
+
+  // 1. Click ID (fbc) - 56.59% improvement in match rate
+  if (pixelData.fbc) {
+    hashedData.fbc = pixelData.fbc;
+  }
+
+  // 2. Browser ID (fbp) - 2.06% improvement
+  if (pixelData.fbp) {
+    hashedData.fbp = pixelData.fbp;
+  }
+
+  // 3. Client IP Address - 23.46% improvement
+  // Note: This should come from request headers in webhook handler
+  if (pixelData.client_ip_address) {
+    hashedData.client_ip_address = pixelData.client_ip_address;
+  }
+
+  // 4. Client User Agent - 23.46% improvement
+  if (pixelData.client_user_agent) {
+    hashedData.client_user_agent = pixelData.client_user_agent;
+  }
+
+  // 5. External ID (optional) - 2.06% improvement
+  // Use order number as external ID for cross-platform tracking
+  if (orderData.number) {
+    hashedData.external_id = String(orderData.number);
+  }
+
+  return hashedData;
 }
 
 /**

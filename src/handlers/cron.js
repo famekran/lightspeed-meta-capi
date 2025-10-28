@@ -76,8 +76,9 @@ export async function handleCron(event, env) {
 
             console.log(`Sending order ${order.number} to Meta CAPI (${products.length} products)...`);
 
-            // Send to Meta CAPI
-            const metaResponse = await sendPurchaseEvent(order, shopConfig);
+            // Send to Meta CAPI (no pixel data for cron-based orders)
+            // Note: IP/User-Agent not available for cron, only for webhook
+            const metaResponse = await sendPurchaseEvent(order, shopConfig, {});
 
             // Mark as sent (24h TTL)
             if (env.ORDER_DEDUP) {
