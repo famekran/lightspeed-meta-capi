@@ -52,14 +52,40 @@ export async function handleWebhook(request, env) {
     // Extract order data - Lightspeed may send {order: {...}} or just {...}
     const payload = rawPayload.order || rawPayload;
 
-    // Extract pixel data from payload if sent from thank-you page
-    const pixelData = {
-      fbc: rawPayload.fbc || null,
-      fbp: rawPayload.fbp || null,
-      client_user_agent: rawPayload.client_user_agent || request.headers.get('User-Agent') || null,
-      client_ip_address: request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || null,
-      event_source_url: rawPayload.event_source_url || null
-    };
+    // Try to retrieve pixel data from KV (stored by browser)
+    let pixelData = {};
+    if (payload.number && env.PIXEL_DATA_KV) {
+      const kvKey = `pixel_data_${shopConfig.id}_${payload.number}`;
+      const storedPixelData = await env.PIXEL_DATA_KV.get(kvKey);
+
+      if (storedPixelData) {
+        try {
+          pixelData = JSON.parse(storedPixelData);
+          console.log(`Retrieved pixel data from KV for order ${payload.number}:`, {
+            fbc: pixelData.fbc ? 'present' : 'missing',
+            fbp: pixelData.fbp ? 'present' : 'missing',
+            client_ip_address: pixelData.client_ip_address ? 'present' : 'missing'
+          });
+        } catch (e) {
+          console.warn('Failed to parse pixel data from KV:', e);
+        }
+      } else {
+        console.log(`No pixel data found in KV for order ${payload.number} (may not have loaded yet)`);
+      }
+    }
+
+    // Fallback: extract from payload if sent directly (legacy support)
+    if (!pixelData.fbc && rawPayload.fbc) pixelData.fbc = rawPayload.fbc;
+    if (!pixelData.fbp && rawPayload.fbp) pixelData.fbp = rawPayload.fbp;
+    if (!pixelData.client_user_agent) {
+      pixelData.client_user_agent = rawPayload.client_user_agent || request.headers.get('User-Agent') || null;
+    }
+    if (!pixelData.client_ip_address) {
+      pixelData.client_ip_address = request.headers.get('CF-Connecting-IP') || request.headers.get('X-Forwarded-For') || null;
+    }
+    if (!pixelData.event_source_url && rawPayload.event_source_url) {
+      pixelData.event_source_url = rawPayload.event_source_url;
+    }
 
     console.log(`Webhook payload:`, {
       orderId: payload.number,

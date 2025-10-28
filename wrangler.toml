@@ -14,11 +14,18 @@ workers_dev = true
 # binding = "LOGS"
 # bucket_name = "lightspeed-meta-logs"
 
-# KV Namespaces - Voor order deduplication
+# KV Namespaces
+# 1. Order deduplication (prevent duplicate webhook processing)
 [[kv_namespaces]]
 binding = "ORDER_DEDUP"
 id = "c261da492df0431d8ca4e74e71cb046e"
 preview_id = "b7e3dee45ea84127b70a7d563425f041"
+
+# 2. Pixel data storage (fbc, fbp from browser)
+[[kv_namespaces]]
+binding = "PIXEL_DATA_KV"
+id = "12eed91ee98246308b01517ba9bd677f"
+preview_id = "95434db769cb4823a955d9d48db9173d"
 
 # Environment Variables (non-sensitive only)
 [vars]

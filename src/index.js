@@ -7,6 +7,7 @@
 
 import { handleWebhook } from './handlers/webhook.js';
 import { handleCron } from './handlers/cron.js';
+import { handlePixelData } from './handlers/pixel-data.js';
 import { listShops } from './config/shops.js';
 
 export default {
@@ -52,9 +53,14 @@ export default {
       });
     }
 
-    // Webhook endpoint
+    // Webhook endpoint (Lightspeed order.created)
     if (path === '/webhook' && request.method === 'POST') {
       return await handleWebhook(request, env);
+    }
+
+    // Pixel data endpoint (browser sends fbc/fbp)
+    if (path === '/pixel-data' && request.method === 'POST') {
+      return await handlePixelData(request, env);
     }
 
     // 404 for unknown routes
