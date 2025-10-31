@@ -49,8 +49,20 @@ export async function handlePixelData(request, env) {
 
     // 5. Build complete pixel data object
     const completePixelData = {
+      // Meta CAPI parameters
       fbc: pixelData.fbc || null,
       fbp: pixelData.fbp || null,
+
+      // GA4 Measurement Protocol parameters
+      ga_client_id: pixelData.ga_client_id || null,
+      ga_session_id: pixelData.ga_session_id || null,
+      gclid: pixelData.gclid || null,
+
+      // Attribution parameters
+      utm: pixelData.utm || null,
+      referrer: pixelData.referrer || null,
+
+      // Shared parameters
       client_user_agent: pixelData.client_user_agent || request.headers.get('User-Agent') || null,
       client_ip_address: clientIp,
       event_source_url: pixelData.event_source_url || null,
@@ -62,21 +74,34 @@ export async function handlePixelData(request, env) {
     const kvKey = `pixel_data_${shopId}_${pixelData.order_id}`;
 
     if (!env.PIXEL_DATA_KV) {
-      console.warn('PIXEL_DATA_KV binding not found, pixel data will not be stored');
+      console.error('❌ PIXEL_DATA_KV binding not found!');
       return jsonResponse({
-        success: true,
-        warning: 'KV not configured',
-        message: 'Pixel data received but not stored (KV binding missing)'
-      }, 200);
+        success: false,
+        error: 'KV binding missing',
+        message: 'PIXEL_DATA_KV binding not available in Worker environment'
+      }, 500);
     }
 
-    await env.PIXEL_DATA_KV.put(kvKey, JSON.stringify(completePixelData), {
-      expirationTtl: 3600 // 1 hour TTL (webhook should arrive within minutes)
-    });
+    console.log('📝 Writing to KV:', kvKey);
+
+    try {
+      await env.PIXEL_DATA_KV.put(kvKey, JSON.stringify(completePixelData), {
+        expirationTtl: 3600 // 1 hour TTL (webhook should arrive within minutes)
+      });
+      console.log('✅ KV write successful');
+    } catch (kvError) {
+      console.error('❌ KV write failed:', kvError);
+      return jsonResponse({
+        success: false,
+        error: 'KV write failed',
+        message: kvError.message
+      }, 500);
+    }
 
     console.log(`Pixel data stored for ${shopId} order ${pixelData.order_id}:`, {
       fbc: completePixelData.fbc ? 'present' : 'missing',
       fbp: completePixelData.fbp ? 'present' : 'missing',
+      ga_client_id: completePixelData.ga_client_id ? 'present' : 'missing',
       client_ip_address: completePixelData.client_ip_address ? 'present' : 'missing',
       client_user_agent: completePixelData.client_user_agent ? 'present' : 'missing'
     });
@@ -89,6 +114,7 @@ export async function handlePixelData(request, env) {
       stored: {
         fbc: !!completePixelData.fbc,
         fbp: !!completePixelData.fbp,
+        ga_client_id: !!completePixelData.ga_client_id,
         client_ip_address: !!completePixelData.client_ip_address,
         client_user_agent: !!completePixelData.client_user_agent
       }

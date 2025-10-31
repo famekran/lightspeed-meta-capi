@@ -6,6 +6,7 @@
 export function getShopConfig(shopId, env) {
   const shops = {
     vikginchoice: {
+      id: 'vikginchoice',
       name: 'VikGinChoice',
       domain: 'vikginchoice.nl',
       lightspeed: {
@@ -20,9 +21,15 @@ export function getShopConfig(shopId, env) {
         pixelId: env.VIKGINCHOICE_META_PIXEL_ID,
         apiVersion: 'v18.0',
         testMode: false
+      },
+      ga4: {
+        measurementId: env.VIKGINCHOICE_GA4_MEASUREMENT_ID,
+        apiSecret: env.VIKGINCHOICE_GA4_API_SECRET,
+        enabled: true
       }
     },
     retoertje: {
+      id: 'retoertje',
       name: 'Retoertje',
       domain: 'retoertje.nl',
       lightspeed: {
@@ -37,6 +44,11 @@ export function getShopConfig(shopId, env) {
         pixelId: env.RETOERTJE_META_PIXEL_ID,
         apiVersion: 'v18.0',
         testMode: false
+      },
+      ga4: {
+        measurementId: env.RETOERTJE_GA4_MEASUREMENT_ID,
+        apiSecret: env.RETOERTJE_GA4_API_SECRET,
+        enabled: true
       }
     }
   };

@@ -26,6 +26,27 @@ export default {
       });
     }
 
+    // Debug endpoint - check env variables
+    if (path === '/debug-env') {
+      const envKeys = Object.keys(env).filter(k => !k.startsWith('_') && k !== 'ORDER_DEDUP' && k !== 'PIXEL_DATA_KV');
+      const vikKeys = envKeys.filter(k => k.includes('VIKGINCHOICE'));
+      return new Response(JSON.stringify({
+        availableEnvKeys: envKeys,
+        vikginchoiceKeys: vikKeys,
+        vikginchoiceValues: {
+          API_KEY: env.VIKGINCHOICE_LIGHTSPEED_API_KEY ? 'present (' + String(env.VIKGINCHOICE_LIGHTSPEED_API_KEY).length + ' chars)' : 'MISSING',
+          API_SECRET: env.VIKGINCHOICE_LIGHTSPEED_API_SECRET ? 'present (' + String(env.VIKGINCHOICE_LIGHTSPEED_API_SECRET).length + ' chars)' : 'MISSING',
+          SHOP_ID: env.VIKGINCHOICE_LIGHTSPEED_SHOP_ID ? 'present (' + String(env.VIKGINCHOICE_LIGHTSPEED_SHOP_ID).length + ' chars)' : 'MISSING',
+          META_TOKEN: env.VIKGINCHOICE_META_ACCESS_TOKEN ? 'present (' + String(env.VIKGINCHOICE_META_ACCESS_TOKEN).length + ' chars)' : 'MISSING',
+          META_PIXEL: env.VIKGINCHOICE_META_PIXEL_ID ? 'present (' + String(env.VIKGINCHOICE_META_PIXEL_ID).length + ' chars)' : 'MISSING'
+        },
+        retoertjeKeys: envKeys.filter(k => k.includes('RETOERTJE')),
+        totalSecrets: envKeys.length
+      }, null, 2), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // Health check endpoint
     if (path === '/' || path === '/health') {
       return new Response(JSON.stringify({

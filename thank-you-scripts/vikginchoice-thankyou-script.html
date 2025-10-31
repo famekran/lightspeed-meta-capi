@@ -1,0 +1,103 @@
+<!--
+  VikGinChoice.nl Thank-You Page Script
+  Sends pixel data (Meta fbc/fbp + GA4 client_id) to Worker for server-side tracking
+
+  INSTALLATION:
+  1. Go to Lightspeed Admin → Themes → Edit Theme
+  2. Find "Thank You Page" or "Order Confirmation" template
+  3. Paste this script AFTER the existing GA4 and Meta Pixel scripts
+  4. Replace {{order.number}} with actual Lightspeed variable
+-->
+
+<script>
+  (function() {
+    'use strict';
+
+    // === CONFIGURATION ===
+    const WORKER_URL = 'https://lightspeed-meta-capi.f-amekran.workers.dev/pixel-data?shop=vikginchoice';
+    const ORDER_ID = '{{order.number}}'; // Lightspeed variable
+
+    // === COOKIE EXTRACTION FUNCTIONS ===
+
+    /**
+     * Extract Meta Click ID from _fbc cookie
+     * Format: fb.1.1234567890.IwY2xjawLm...
+     */
+    function getFBC() {
+      const match = document.cookie.match(/(?:^|;)\s*_fbc\s*=\s*([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    /**
+     * Extract Meta Browser ID from _fbp cookie
+     * Format: fb.1.1234567890.1234567890
+     */
+    function getFBP() {
+      const match = document.cookie.match(/(?:^|;)\s*_fbp\s*=\s*([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    /**
+     * Extract GA4 Client ID from _ga cookie
+     * Format: GA1.2.1234567890.1234567890
+     * Returns: 1234567890.1234567890 (without GA1.2. prefix)
+     */
+    function getGA4ClientId() {
+      const match = document.cookie.match(/(?:^|;)\s*_ga\s*=\s*([^;]+)/);
+      if (match) {
+        const value = decodeURIComponent(match[1]);
+        // Remove "GA1.X." prefix (first 6 characters after splitting)
+        const parts = value.split('.');
+        if (parts.length >= 4) {
+          // Return everything after GA1.X
+          return parts.slice(2).join('.');
+        }
+      }
+      return null;
+    }
+
+    // === COLLECT PIXEL DATA ===
+    const pixelData = {
+      order_id: ORDER_ID,
+
+      // Meta CAPI parameters
+      fbc: getFBC(),
+      fbp: getFBP(),
+
+      // GA4 Measurement Protocol parameter
+      ga_client_id: getGA4ClientId(),
+
+      // Shared parameters
+      client_user_agent: navigator.userAgent,
+      event_source_url: window.location.href
+    };
+
+    console.log('🔍 VikGinChoice Pixel Data:', {
+      order_id: pixelData.order_id,
+      fbc: pixelData.fbc ? 'present' : 'missing',
+      fbp: pixelData.fbp ? 'present' : 'missing',
+      ga_client_id: pixelData.ga_client_id ? 'present' : 'missing'
+    });
+
+    // === SEND TO WORKER ===
+    fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(pixelData),
+      keepalive: true // Ensures request completes even if user navigates away
+    })
+    .then(function(response) {
+      return response.json();
+    })
+    .then(function(result) {
+      console.log('✅ VikGinChoice pixel data sent successfully:', result);
+    })
+    .catch(function(error) {
+      console.warn('⚠️ Failed to send VikGinChoice pixel data:', error);
+      // Non-blocking: error won't affect page functionality
+    });
+
+  })();
+</script>

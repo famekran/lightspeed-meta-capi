@@ -1,0 +1,166 @@
+<!--
+  Retoertje.nl Thank-You Page Script - ENHANCED VERSION
+
+  Includes ALL tracking parameters:
+  - Meta: fbc (click ID), fbp (browser ID)
+  - GA4: client_id, session_id, gclid (Google Ads Click ID)
+
+  INSTALLATION:
+  1. Go to Lightspeed Admin → Themes → Edit Theme
+  2. Find "Thank You Page" template
+  3. Paste AFTER existing GA4/Meta Pixel scripts
+  4. Replace {{order.number}} with actual Lightspeed variable
+-->
+
+<script>
+  (function() {
+    'use strict';
+
+    // === CONFIGURATION ===
+    const WORKER_URL = 'https://lightspeed-meta-capi.f-amekran.workers.dev/pixel-data?shop=retoertje';
+    const ORDER_ID = '{{ order.information.number }}';
+    const GA4_MEASUREMENT_ID = 'G-NBZL3D7WK8'; // For session ID extraction
+
+    // === COOKIE EXTRACTION FUNCTIONS ===
+
+    /**
+     * Extract Meta Click ID from _fbc cookie
+     * Created when user clicks Facebook ad with fbclid parameter
+     */
+    function getFBC() {
+      const match = document.cookie.match(/(?:^|;)\s*_fbc\s*=\s*([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    /**
+     * Extract Meta Browser ID from _fbp cookie
+     * Created by Meta Pixel on first visit
+     */
+    function getFBP() {
+      const match = document.cookie.match(/(?:^|;)\s*_fbp\s*=\s*([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    /**
+     * Extract GA4 Client ID from _ga cookie
+     * Format: GA1.2.1234567890.1234567890
+     * Returns: 1234567890.1234567890 (without GA1.2. prefix)
+     *
+     * IMPORTANT: Must match the client_id that gtag.js sends to GA4!
+     * GA4 uses the part AFTER "GA1.X." as the actual client_id.
+     */
+    function getGA4ClientId() {
+      const match = document.cookie.match(/(?:^|;)\s*_ga\s*=\s*([^;]+)/);
+      if (match) {
+        const value = decodeURIComponent(match[1]);
+        // Format: GA1.2.1234567890.1234567890
+        const parts = value.split('.');
+
+        if (parts.length >= 4) {
+          // Return everything after GA1.X (parts[2] and parts[3])
+          return parts.slice(2).join('.');
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Extract GA4 Session ID from _ga_XXXXX cookie (NEW!)
+     * Format: GS1.1.sessionId.timestamp.eventCount
+     * Returns: sessionId
+     */
+    function getGA4SessionId() {
+      // Remove G- prefix and dots from measurement ID
+      const cookieName = '_ga_' + GA4_MEASUREMENT_ID.replace('G-', '').replace(/-/g, '');
+      const regex = new RegExp('(?:^|;)\\s*' + cookieName + '\\s*=\\s*([^;]+)');
+      const match = document.cookie.match(regex);
+
+      if (match) {
+        const value = decodeURIComponent(match[1]);
+        const parts = value.split('.');
+        // Format: GS1.1.sessionId.timestamp.count
+        if (parts.length >= 3) {
+          return parts[2]; // Session ID
+        }
+      }
+      return null;
+    }
+
+    /**
+     * Extract Google Click ID from URL parameter (NEW!)
+     * Added by Google Ads when user clicks ad
+     */
+    function getGclid() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('gclid') || null;
+    }
+
+    /**
+     * Extract any UTM parameters for attribution (NEW!)
+     */
+    function getUtmParameters() {
+      const urlParams = new URLSearchParams(window.location.search);
+      return {
+        utm_source: urlParams.get('utm_source') || null,
+        utm_medium: urlParams.get('utm_medium') || null,
+        utm_campaign: urlParams.get('utm_campaign') || null,
+        utm_term: urlParams.get('utm_term') || null,
+        utm_content: urlParams.get('utm_content') || null
+      };
+    }
+
+    // === COLLECT ENHANCED PIXEL DATA ===
+    const pixelData = {
+      order_id: ORDER_ID,
+
+      // Meta CAPI parameters
+      fbc: getFBC(),
+      fbp: getFBP(),
+
+      // GA4 Measurement Protocol parameters
+      ga_client_id: getGA4ClientId(),
+      ga_session_id: getGA4SessionId(),    // NEW!
+      gclid: getGclid(),                    // NEW! (Google Ads)
+
+      // Attribution parameters
+      utm: getUtmParameters(),              // NEW!
+
+      // Shared parameters
+      client_user_agent: navigator.userAgent,
+      event_source_url: window.location.href,
+
+      // Page referrer (where user came from)
+      referrer: document.referrer || null
+    };
+
+    // Log for debugging (remove in production if desired)
+    console.log('🔍 Retoertje Enhanced Pixel Data:', {
+      order_id: pixelData.order_id,
+      fbc: pixelData.fbc ? 'present' : 'missing',
+      fbp: pixelData.fbp ? 'present' : 'missing',
+      ga_client_id: pixelData.ga_client_id ? 'present' : 'missing',
+      ga_session_id: pixelData.ga_session_id ? 'present' : 'missing',
+      gclid: pixelData.gclid ? 'present' : 'missing'
+    });
+
+    // === SEND TO WORKER ===
+    fetch(WORKER_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(pixelData),
+      keepalive: true
+    })
+    .then(function(response) {
+      return response.json();
+    })
+    .then(function(result) {
+      console.log('✅ Retoertje enhanced pixel data sent successfully:', result);
+    })
+    .catch(function(error) {
+      console.warn('⚠️ Failed to send Retoertje pixel data:', error);
+    });
+
+  })();
+</script>

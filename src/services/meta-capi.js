@@ -145,7 +145,8 @@ async function buildUserData(orderData, pixelData = {}) {
  */
 function buildCustomData(orderData) {
   // Extract product data (fetched separately via /orders/{id}/products.json)
-  const products = orderData.products || [];
+  // IMPORTANT: Ensure products is always an array, even if undefined/null/not-an-array
+  const products = Array.isArray(orderData.products) ? orderData.products : [];
 
   // Extract variant IDs or product IDs from the orderProduct objects
   // Note: variant is a resource object, we need to extract the ID from it

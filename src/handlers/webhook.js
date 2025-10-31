@@ -6,6 +6,7 @@
 import { getShopConfig } from '../config/shops.js';
 import { resolveShopFromRequest } from '../utils/shop-resolver.js';
 import { sendPurchaseEvent } from '../services/meta-capi.js';
+import { sendGA4PurchaseEvent } from '../services/ga4-api.js';
 
 /**
  * Handle Lightspeed webhook POST request
@@ -31,7 +32,9 @@ export async function handleWebhook(request, env) {
     let shopConfig;
     try {
       shopConfig = getShopConfig(shopId, env);
+      console.log(`Shop config loaded for: ${shopConfig.name}`);
     } catch (error) {
+      console.error('Shop config error:', error);
       return jsonResponse({
         error: 'Invalid shop or missing credentials',
         message: error.message
@@ -42,7 +45,9 @@ export async function handleWebhook(request, env) {
     let rawPayload;
     try {
       rawPayload = await request.json();
+      console.log(`Webhook payload parsed, order number: ${rawPayload.order?.number || rawPayload.number || 'unknown'}`);
     } catch (error) {
+      console.error('JSON parse error:', error);
       return jsonResponse({
         error: 'Invalid JSON payload',
         message: error.message
@@ -118,40 +123,103 @@ export async function handleWebhook(request, env) {
       }
     }
 
-    // 6. Send to Meta CAPI with pixel data
+    // 6. Send to BOTH Meta CAPI and GA4 (parallel)
     try {
-      const result = await sendPurchaseEvent(payload, shopConfig, pixelData);
+      console.log(`Sending purchase event to both Meta and GA4 for order ${payload.number}`);
 
-      // Mark as sent (24h TTL)
+      // Send to both platforms in parallel using Promise.allSettled
+      // This ensures one platform failure doesn't block the other
+      const [metaResult, ga4Result] = await Promise.allSettled([
+        sendPurchaseEvent(payload, shopConfig, pixelData),
+        sendGA4PurchaseEvent(payload, shopConfig, pixelData)
+      ]);
+
+      // Log results for each platform
+      const metaSuccess = metaResult.status === 'fulfilled';
+      const ga4Success = ga4Result.status === 'fulfilled';
+
+      console.log('Platform sending results:', {
+        meta: metaSuccess ? '✅ Success' : '❌ Failed',
+        ga4: ga4Success ? '✅ Success' : ga4Result.reason?.skipped ? '⊘ Skipped' : '❌ Failed'
+      });
+
+      // Log detailed error if Meta failed
+      if (!metaSuccess) {
+        console.error('❌ Meta CAPI failed:', {
+          error: metaResult.reason?.message || 'Unknown error',
+          orderId: payload.number,
+          stack: metaResult.reason?.stack
+        });
+      }
+
+      // Log detailed error if GA4 failed (and not skipped)
+      if (!ga4Success && !ga4Result.reason?.skipped) {
+        console.error('❌ GA4 failed:', {
+          error: ga4Result.reason?.message || 'Unknown error',
+          orderId: payload.number,
+          stack: ga4Result.reason?.stack
+        });
+      }
+
+      // Mark as sent (24h TTL) - even if one platform failed
       if (env.ORDER_DEDUP) {
         await env.ORDER_DEDUP.put(dedupKey, JSON.stringify({
           timestamp: new Date().toISOString(),
           orderId: payload.number,
-          shop: shopConfig.name
+          shop: shopConfig.name,
+          platforms: {
+            meta: metaSuccess,
+            ga4: ga4Success || ga4Result.reason?.skipped
+          }
         }), { expirationTtl: 86400 }); // 24 hours
       }
 
-      return jsonResponse({
-        success: true,
+      // Build response with both platform results
+      const response = {
+        success: metaSuccess || ga4Success, // At least one succeeded
         shop: shopConfig.name,
         orderId: payload.number,
         eventId: `purchase_${payload.number}`,
-        metaResponse: {
-          eventsReceived: result.events_received,
-          fbtrace_id: result.fbtrace_id
+        platforms: {
+          meta: metaSuccess ? {
+            success: true,
+            eventsReceived: metaResult.value.events_received,
+            fbtrace_id: metaResult.value.fbtrace_id
+          } : {
+            success: false,
+            error: metaResult.reason?.message
+          },
+          ga4: ga4Success ? {
+            success: true
+          } : ga4Result.reason?.skipped ? {
+            success: false,
+            skipped: true,
+            reason: ga4Result.reason.reason
+          } : {
+            success: false,
+            error: ga4Result.reason?.message
+          }
         }
-      }, 200);
+      };
+
+      // Return 200 if at least one platform succeeded, 500 if both failed
+      const statusCode = (metaSuccess || ga4Success) ? 200 : 500;
+
+      return jsonResponse(response, statusCode);
+
     } catch (error) {
-      console.error('Meta CAPI Error:', error);
+      console.error('Webhook processing error:', error.message);
+      console.error('Error stack:', error.stack);
 
       return jsonResponse({
-        error: 'Failed to send event to Meta',
+        error: 'Failed to process webhook',
         message: error.message,
-        orderId: payload.number
+        orderId: payload?.number || 'unknown'
       }, 500);
     }
   } catch (error) {
-    console.error('Webhook handler error:', error);
+    console.error('Webhook handler error:', error.message);
+    console.error('Error stack:', error.stack);
 
     return jsonResponse({
       error: 'Internal server error',
